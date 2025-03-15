@@ -67,7 +67,7 @@ const PoseDetection: React.FC = () => {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
     
-        // Ensure video metadata is loaded before processing frames
+        // Ensure video metadata is loaded before processing frames.
         await new Promise<void>((resolve) => {
           videoRef.current!.onloadedmetadata = () => {
             console.log("Video Loaded:", videoRef.current!.videoWidth, "x", videoRef.current!.videoHeight);
@@ -287,17 +287,48 @@ const PoseDetection: React.FC = () => {
   
 
   return (
-    <div>
-      <h2>Interactive AI for Kids</h2>
-      <canvas ref={canvasRef} width="640" height="480"
-        style={{ position: "absolute", top: 0, left: 0, zIndex: 10, pointerEvents: "none" }}
-      />
-      <video ref={videoRef} autoPlay playsInline
-        style={{ position: "absolute", top: 0, left: 0, zIndex: 5 }}
-      />
-      <h3>AI Response: {aiResponse}</h3>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100vh" }}>
+      {/* Video & Canvas Wrapper */}
+      <div style={{ position: "relative", width: "640px", height: "480px", display: "flex", justifyContent: "center", alignItems: "center" }}>
+        {/* Camera Feed (Lowest Layer) */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            zIndex: 1, // ✅ Lowest layer
+          }}
+        />
+  
+        {/* Pose Detection Canvas (Above Video) */}
+        <canvas
+          ref={canvasRef}
+          width="640"
+          height="480"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: "100%",
+            height: "100%",
+            zIndex: 2, // ✅ Above video but below text
+            pointerEvents: "none", // Prevents interference with mouse clicks
+          }}
+        />
+      </div>
+  
+      {/* Centered UI Elements Below Video */}
+      <div style={{ textAlign: "center", marginTop: "20px" }}>
+        <h2>Interactive AI for Kids</h2>
+        <h3>AI Response: {aiResponse}</h3>
+      </div>
     </div>
-  );
+  );  
 };
 
 export default PoseDetection;
