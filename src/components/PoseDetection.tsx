@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState } from "react";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-webgl"; // Ensure WebGL is loaded
 import * as posenet from "@tensorflow-models/posenet";
 
-// Define a TypeScript interface for PoseNet keypoints
+// TypeScript interface for PoseNet keypoints
 interface Keypoint {
   part: string;
   position: { x: number; y: number };
@@ -11,6 +13,21 @@ interface Keypoint {
 interface Pose {
   keypoints: Keypoint[];
 }
+
+// Load and initialize PoseNet.
+const loadPoseNet = async (): Promise<posenet.PoseNet | null> => {
+  try {
+    await tf.setBackend("webgl"); // Try WebGL first
+    await tf.ready(); // Wait until TensorFlow is ready
+    console.log("TensorFlow.js backend:", tf.getBackend());
+
+    const net = await posenet.load();
+    return net;
+  } catch (error) {
+    console.error("Error loading PoseNet:", error);
+    return null;
+  }
+};
 
 // Function to call Azure OpenAI API.
 const fetchAIResponse = async (userInput: string) => {
@@ -22,22 +39,20 @@ const fetchAIResponse = async (userInput: string) => {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "api-key": AZURE_OPENAI_API_KEY,  // Azure uses "api-key" instead of "Authorization"
+      "api-key": AZURE_OPENAI_API_KEY,  // Azure uses "api-key" instead of "Authorization".
     },
     body: JSON.stringify({
       messages: [{ role: "system", content: "You're a friendly AI doctor for kids." },
                  { role: "user", content: userInput }],
-      max_tokens: 50  // Reduce token usage for cheaper costs
+      max_tokens: 50  // Reduce token usage for cheaper costs.
     }),
   });
 
   const data = await response.json();
-  return data.choices[0].message.content;
+  return data.choices[0].message.content || "No response received.";
 };
 
-
-
-// Function to make the AI speak
+// Function to make the AI speak.
 const speakText = (text: string): void => {
   const utterance = new SpeechSynthesisUtterance(text);
   speechSynthesis.speak(utterance);
@@ -48,19 +63,49 @@ const PoseDetection: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string>("");
 
   useEffect(() => {
-    async function setupCamera(): Promise<void> {
+    const setupCamera = async (): Promise<void> => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+    
+        // Ensure video metadata is loaded before processing frames
+        await new Promise<void>((resolve) => {
+          videoRef.current!.onloadedmetadata = () => resolve();
+        });
+    
+        console.log("Camera is ready:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
       }
-    }
+    };    
 
-    async function loadPoseNet(): Promise<posenet.PoseNet> {
-      return await posenet.load();
-    }
+    const loadPoseNet = async (): Promise<posenet.PoseNet | null> => {
+      try {
+        // Check if WebGL is available; if not, fallback to CPU.
+        const isWebGLAvailable = tf.ENV.get("WEBGL_RENDER_FLOAT32_CAPABLE");
+        console.log("WebGL Supported:", isWebGLAvailable);
+
+        if (isWebGLAvailable) {
+          await tf.setBackend("webgl"); // Use WebGL if available
+        } else {
+          console.warn("WebGL is not supported, switching to CPU backend.");
+          await tf.setBackend("cpu"); // Fallback to CPU
+        }
+        await tf.ready(); // Wait until TensorFlow is fully initialized
+    
+        console.log("TensorFlow.js backend:", tf.getBackend());
+    
+        return await posenet.load();
+      } catch (error) {
+        console.error("Error loading PoseNet:", error);
+        return null;
+      }
+    };    
 
     async function detectPose(net: posenet.PoseNet): Promise<void> {
-      if (!videoRef.current) return;
+      if (!videoRef.current || videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.warn("Skipping pose detection: Video is not ready");
+        return;
+      }
 
       const pose = await net.estimateSinglePose(videoRef.current, {
         flipHorizontal: false,
