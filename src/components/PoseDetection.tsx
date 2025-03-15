@@ -4,6 +4,8 @@ import "@tensorflow/tfjs-backend-webgl"; // Ensure WebGL is loaded
 import * as posenet from "@tensorflow-models/posenet";
 
 import { useOpenAI } from "./hooks/useOpenAI";
+import { useSpeechSynthesis } from "./hooks/useSpeechSynthesis";
+
 
 // TypeScript interface for PoseNet keypoints
 interface Keypoint {
@@ -55,6 +57,7 @@ const PoseDetection: React.FC = () => {
   const [isAiResponding, setIsAiResponding] = useState(false); // Prevent multiple API calls.
 
   const { fetchAIResponse, isLoading, error } = useOpenAI();
+  const { speakText } = useSpeechSynthesis();
 
   useEffect(() => {
     const setupCamera = async (): Promise<void> => {
@@ -192,33 +195,6 @@ const PoseDetection: React.FC = () => {
   
     return Math.abs(leftEar.position.y - rightEar.position.y) > 20;
   }
-
-  // Function to make the AI speak.
-  const speakText = (text: string, language: string = "en"): Promise<void> => {
-    return new Promise((resolve) => {
-      const voices = window.speechSynthesis.getVoices();
-
-      // Pick a voice that matches the detected language
-      const selectedVoice = voices.find(voice => voice.lang.startsWith(language)) || voices[0];
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.voice = selectedVoice;
-      utterance.pitch = 1.1;
-      utterance.rate = 0.9;
-      utterance.volume = 1.0;
-
-      utterance.onend = () => {
-        console.log("🗣️ Speech finished.");
-        resolve();
-        setTimeout(() => {
-          // Release lock after AI response is completed.
-          setIsAiResponding(false);
-        }, 3000);
-      };
-
-      speechSynthesis.speak(utterance);
-    });
-  };
 
   const listenForSpeech = (): void => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
