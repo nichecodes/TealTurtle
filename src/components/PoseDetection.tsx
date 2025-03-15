@@ -131,7 +131,14 @@ const PoseDetection: React.FC = () => {
 
     async function runPoseDetection(): Promise<void> {
       await setupCamera();
-      const net = await loadPoseNet();
+      const net = await loadPoseNet(); // `net` might be null if loading fails
+      
+      // Stop execution if PoseNet didn't load.
+      if (!net) {
+        console.error("PoseNet failed to load.");
+        return; 
+      }
+    
       detectPose(net);
     }
 
