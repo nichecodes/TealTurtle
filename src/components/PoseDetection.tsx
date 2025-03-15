@@ -60,6 +60,7 @@ const PoseDetection: React.FC = () => {
   const { speakText } = useSpeechSynthesis();
 
   useEffect(() => {
+
     const setupCamera = async (): Promise<void> => {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     
@@ -78,10 +79,6 @@ const PoseDetection: React.FC = () => {
       }
     };
 
-    window.speechSynthesis.onvoiceschanged = () => {
-      console.log("Voices Loaded:", window.speechSynthesis.getVoices());
-    };
-
     async function detectPose(net: posenet.PoseNet): Promise<void> {
       if (!videoRef.current || videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0 || !canvasRef.current) {
         console.warn("Skipping pose detection: Video is not ready");
@@ -98,6 +95,7 @@ const PoseDetection: React.FC = () => {
       const pose = await net.estimateSinglePose(inputTensor, {
         flipHorizontal: false,
       });
+      inputTensor.dispose(); // Need to dispose the tensor to free up memory.
 
       //console.log("Pose Data:", pose.keypoints.map(kp => `${kp.part}: (${kp.position.x}, ${kp.position.y})`));
       // !!!!!!!!!!!!!!!!!!! START Troubleshoot Keypoint Detection Section !!!!!!!!!!!!!!!!!!!!!!!

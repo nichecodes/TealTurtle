@@ -26,7 +26,9 @@ export const useOpenAI = () => {
               {
                 role: "system",
                 content:
-                  "You're a friendly AI doctor for kids. Provide warm, encouraging responses based on detected gestures and spoken words.",
+                  "You're a friendly AI physician assistant for kids. Your tasked with explaining to very young kids how " +
+                  "diseases affect certain parts of the body that they ask about. Use simple language and examples that a " +
+                  "5-year-old can understand. Avoid complex medical terms and provide clear, relatable explanations.",
               },
               { role: "user", content: userInput },
             ],

@@ -44,8 +44,13 @@ export const useSpeechRecognition = () => {
     };
 
     recognition.onerror = (error: any) => {
-      console.error("❌ Speech Recognition Error:", error);
-    };
+      if (error.error === "no-speech") {
+          console.warn("No speech detected. Restarting...");
+          setTimeout(() => recognition.start(), 5000);
+          return;
+      }
+      console.error("Speech Recognition Error:", error);
+  };
 
     window.speechSynthesis.addEventListener("start", () => {
       console.log("🛑 Stopping speech recognition while AI is speaking...");
