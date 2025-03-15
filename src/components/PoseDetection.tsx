@@ -59,26 +59,14 @@ const fetchAIResponse = async (userInput: string) => {
       "api-key": AZURE_OPENAI_API_KEY,  // Azure uses "api-key" instead of "Authorization".
     },
     body: JSON.stringify({
-      messages: [{ role: "system", content: "You're a friendly AI doctor for kids." },
+      messages: [{ role: "system", content: "You're a friendly AI doctor for kids. Provide warm, encouraging responses based on detected gestures and spoken words." },
                  { role: "user", content: userInput }],
-      max_tokens: 50  // Reduce token usage for cheaper costs.
+      max_tokens: 100  // Reduce token usage for cheaper costs.
     }),
   });
 
   const data = await response.json();
   return data.choices[0].message.content || "No response received.";
-};
-
-// Function to make the AI speak.
-const speakText = (text: string): Promise<void> => {
-  return new Promise((resolve) => {
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onend = () => {
-      console.log("🗣️ Speech finished.");
-      resolve();
-    };
-    speechSynthesis.speak(utterance);
-  });
 };
 
 const PoseDetection: React.FC = () => {
@@ -104,6 +92,10 @@ const PoseDetection: React.FC = () => {
     
         console.log("Camera is ready:", videoRef.current.videoWidth, "x", videoRef.current.videoHeight);
       }
+    };
+
+    window.speechSynthesis.onvoiceschanged = () => {
+      console.log("Voices Loaded:", window.speechSynthesis.getVoices());
     };
 
     async function detectPose(net: posenet.PoseNet): Promise<void> {
@@ -170,9 +162,6 @@ const PoseDetection: React.FC = () => {
         
       } catch (error) {
         console.error("Error in AI response:", error);
-      } finally {
-        // Release lock after AI response is completed.
-        setIsAiResponding(false);
       }
 
       requestAnimationFrame(() => detectPose(net));
@@ -192,6 +181,7 @@ const PoseDetection: React.FC = () => {
     }
 
     runPoseDetection();
+    listenForSpeech();
   }, []);
 
   // Helper function: Detect if hand is raised
@@ -221,6 +211,125 @@ const PoseDetection: React.FC = () => {
   
     return Math.abs(leftEar.position.y - rightEar.position.y) > 20;
   }
+
+  // Function to make the AI speak.
+  const speakText = (text: string, language: string = "en"): Promise<void> => {
+    return new Promise((resolve) => {
+      const voices = window.speechSynthesis.getVoices();
+
+      // Pick a voice that matches the detected language
+      const selectedVoice = voices.find(voice => voice.lang.startsWith(language)) || voices[0];
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.voice = selectedVoice;
+      utterance.pitch = 1.1;
+      utterance.rate = 0.9;
+      utterance.volume = 1.0;
+
+      utterance.onend = () => {
+        console.log("🗣️ Speech finished.");
+        resolve();
+        setTimeout(() => {
+          // Release lock after AI response is completed.
+          setIsAiResponding(false);
+        }, 3000);
+      };
+
+      speechSynthesis.speak(utterance);
+    });
+  };
+
+  const listenForSpeech = (): void => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  
+    if (!SpeechRecognition) {
+      console.error("Speech recognition not supported in this browser.");
+      return;
+    }
+  
+    const recognition = new SpeechRecognition();
+    recognition.lang = navigator.language || "en-US"; // Auto-detect language
+    recognition.continuous = true; // Keep listening continuously
+    recognition.interimResults = false; // Get only the final recognized speech
+  
+    let lastAiResponse = ""; // Trying to avoid loops.
+
+    recognition.onresult = async (event: any) => {
+      if (isAiResponding) return; // Prevent capturing AI's own speech
+  
+      setIsAiResponding(true);
+
+      const spokenText = event.results[event.results.length - 1][0].transcript.trim();
+      console.log("User Said:", spokenText);
+  
+      // Detect language from spoken text
+      const detectedLanguage = await detectLanguage(spokenText);
+      console.log(`Detected Language: ${detectedLanguage}`);
+
+      if (spokenText.toLowerCase() === lastAiResponse.toLowerCase()) {
+        console.warn("Ignoring AI's own response to prevent looping.");
+        return;
+      }
+  
+      handleDetectedSpeech(spokenText, detectedLanguage);
+    };
+  
+    recognition.onerror = (error: any) => {
+      console.error("Speech Recognition Error:", error);
+    };
+
+    window.speechSynthesis.addEventListener("start", () => {
+      console.log("🛑 Stopping speech recognition while AI is speaking...");
+      recognition.abort(); // ✅ Immediate stop
+    });
+  
+    // ✅ Restart recognition with a **longer delay** to prevent picking up AI's speech
+    window.speechSynthesis.addEventListener("end", () => {
+      console.log("✅ AI speech finished. Resuming speech recognition...");
+      setTimeout(() => {
+        recognition.start();
+      }, 4000); // ✅ Wait 4 seconds before restarting
+    });
+
+    recognition.start();
+  };
+  
+  async function handleDetectedSpeech(spokenText: string, language: string) {
+  
+    try {
+      const aiText = await fetchAIResponse(spokenText);
+      setAiResponse(aiText);
+
+      await speakText(aiText, language);
+    } catch (error) {
+      console.error("Error processing AI response:", error);
+    }
+  }
+
+  const detectLanguage = async (text: string): Promise<string> => {
+    const AZURE_OPENAI_API_KEY = import.meta.env.VITE_AZURE_OPENAI_KEY;
+    const AZURE_OPENAI_ENDPOINT = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT;
+    const DEPLOYMENT_NAME = import.meta.env.VITE_DEPLOYMENT_NAME;
+  
+    const response = await fetch(`${AZURE_OPENAI_ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": AZURE_OPENAI_API_KEY,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: "You are a language detection assistant. Identify the language of the given text and return only the language code (e.g., 'en' for English, 'es' for Spanish, 'fr' for French)." },
+          { role: "user", content: text }
+        ],
+        max_tokens: 10
+      }),
+    });
+  
+    const data = await response.json();
+    return data.choices[0]?.message?.content.trim() || "en"; // Default to English if detection fails
+  };
+  
 
   return (
     <div>
