@@ -3,6 +3,8 @@ import * as tf from "@tensorflow/tfjs";
 import "@tensorflow/tfjs-backend-webgl"; // Ensure WebGL is loaded
 import * as posenet from "@tensorflow-models/posenet";
 
+import { useOpenAI } from "./hooks/useOpenAI";
+
 // TypeScript interface for PoseNet keypoints
 interface Keypoint {
   part: string;
@@ -46,34 +48,13 @@ const loadPoseNet = async (): Promise<posenet.PoseNet | null> => {
   }
 };
 
-// Function to call Azure OpenAI API.
-const fetchAIResponse = async (userInput: string) => {
-  const AZURE_OPENAI_API_KEY = import.meta.env.VITE_AZURE_OPENAI_KEY;  // Store in .env
-  const AZURE_OPENAI_ENDPOINT = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT; // Stored in .env
-  const DEPLOYMENT_NAME = import.meta.env.VITE_DEPLOYMENT_NAME; // Stored in .env
-
-  const response = await fetch(`${AZURE_OPENAI_ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "api-key": AZURE_OPENAI_API_KEY,  // Azure uses "api-key" instead of "Authorization".
-    },
-    body: JSON.stringify({
-      messages: [{ role: "system", content: "You're a friendly AI doctor for kids. Provide warm, encouraging responses based on detected gestures and spoken words." },
-                 { role: "user", content: userInput }],
-      max_tokens: 100  // Reduce token usage for cheaper costs.
-    }),
-  });
-
-  const data = await response.json();
-  return data.choices[0].message.content || "No response received.";
-};
-
 const PoseDetection: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [aiResponse, setAiResponse] = useState<string>("");
   const [isAiResponding, setIsAiResponding] = useState(false); // Prevent multiple API calls.
+
+  const { fetchAIResponse, isLoading, error } = useOpenAI();
 
   useEffect(() => {
     const setupCamera = async (): Promise<void> => {
