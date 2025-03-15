@@ -12,25 +12,29 @@ interface Pose {
   keypoints: Keypoint[];
 }
 
-// Function to call LLama 3.
+// Function to call Azure OpenAI API.
 const fetchAIResponse = async (userInput: string) => {
-  const HF_API_KEY = import.meta.env.VITE_HUGGINGFACE_API_KEY;
+  const AZURE_OPENAI_API_KEY = import.meta.env.VITE_AZURE_OPENAI_KEY;  // Store in .env
+  const AZURE_OPENAI_ENDPOINT = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT; // Stored in .env
+  const DEPLOYMENT_NAME = import.meta.env.VITE_DEPLOYMENT_NAME; // Stored in .env
 
-  const response = await fetch("https://api-inference.huggingface.co/models/meta-llama/Llama-3-8B-chat", {
+  const response = await fetch(`${AZURE_OPENAI_ENDPOINT}/openai/deployments/${DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${HF_API_KEY}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
+      "api-key": AZURE_OPENAI_API_KEY,  // Azure uses "api-key" instead of "Authorization"
     },
     body: JSON.stringify({
-      inputs: userInput,  // Llama 3 expects plain input text
-      parameters: { max_new_tokens: 50 }  // Limit output length to save processing time
+      messages: [{ role: "system", content: "You're a friendly AI doctor for kids." },
+                 { role: "user", content: userInput }],
+      max_tokens: 50  // Reduce token usage for cheaper costs
     }),
   });
 
   const data = await response.json();
-  return data.generated_text || "Error: No response received";
+  return data.choices[0].message.content;
 };
+
 
 
 // Function to make the AI speak
