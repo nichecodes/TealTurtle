@@ -4,7 +4,7 @@ export const useSpeechSynthesis = () => {
     console.log("Voices Loaded:", window.speechSynthesis.getVoices());
   };
 
-  const speakText = (text: string, language: string = "en"): Promise<void> => {
+  const speakText = (text, language = "en") => {
     return new Promise((resolve) => {
       const voices = window.speechSynthesis.getVoices();
 
@@ -28,4 +28,3 @@ export const useSpeechSynthesis = () => {
 
   return { speakText };
 };
-  

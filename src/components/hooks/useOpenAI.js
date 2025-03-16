@@ -2,9 +2,9 @@ import { useState } from "react";
 
 export const useOpenAI = () => {
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(null);
 
-  const fetchAIResponse = async (userInput: string): Promise<string> => {
+  const fetchAIResponse = async (userInput) => {
     setIsLoading(true);
     setError(null);
 
@@ -19,7 +19,7 @@ export const useOpenAI = () => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "api-key": AZURE_OPENAI_API_KEY, // Azure uses "api-key" instead of "Authorization"
+            "api-key": AZURE_OPENAI_API_KEY,
           },
           body: JSON.stringify({
             messages: [
@@ -32,7 +32,7 @@ export const useOpenAI = () => {
               },
               { role: "user", content: userInput },
             ],
-            max_tokens: 100, // Limit response length
+            max_tokens: 100,
           }),
         }
       );
@@ -43,7 +43,7 @@ export const useOpenAI = () => {
       }
 
       return data.choices[0]?.message?.content || "No response received.";
-    } catch (err: any) {
+    } catch (err) {
       console.error("❌ OpenAI API Error:", err);
       setError(err.message);
       return "I couldn't process your request.";

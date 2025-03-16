@@ -8,10 +8,10 @@
     "moduleResolution": "Node",
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "allowJs": false,
+    "allowJs": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
   },
-  "include": ["src"]
+  "include": ["src", "src/components/PoseDetection.tsx"]
 }

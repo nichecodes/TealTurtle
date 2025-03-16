@@ -2,17 +2,16 @@ import { useState, useEffect } from "react";
 import { useOpenAI } from "./useOpenAI";
 import { useSpeechSynthesis } from "./useSpeechSynthesis";
 
-
 export const useSpeechRecognition = () => {
   const [isAiResponding, setIsAiResponding] = useState(false);
-  const [aiResponse, setAiResponse] = useState<string>("");
+  const [aiResponse, setAiResponse] = useState("");
   let lastAiResponse = ""; // Track last AI response to avoid loops
 
   const { fetchAIResponse } = useOpenAI();
   const { speakText } = useSpeechSynthesis();
 
   useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       console.error("❌ Speech recognition not supported in this browser.");
@@ -24,7 +23,7 @@ export const useSpeechRecognition = () => {
     recognition.continuous = true; // ✅ Keep listening continuously
     recognition.interimResults = false; // ✅ Get only the final recognized speech
 
-    recognition.onresult = async (event: any) => {
+    recognition.onresult = async (event) => {
       if (isAiResponding) return; // ✅ Prevent capturing AI's own speech
 
       setIsAiResponding(true);
@@ -43,14 +42,14 @@ export const useSpeechRecognition = () => {
       handleDetectedSpeech(spokenText, detectedLanguage);
     };
 
-    recognition.onerror = (error: any) => {
+    recognition.onerror = (error) => {
       if (error.error === "no-speech") {
-          console.warn("No speech detected. Restarting...");
-          setTimeout(() => recognition.start(), 5000);
-          return;
+        console.warn("No speech detected. Restarting...");
+        setTimeout(() => recognition.start(), 5000);
+        return;
       }
       console.error("Speech Recognition Error:", error);
-  };
+    };
 
     window.speechSynthesis.addEventListener("start", () => {
       console.log("🛑 Stopping speech recognition while AI is speaking...");
@@ -67,7 +66,7 @@ export const useSpeechRecognition = () => {
     recognition.start();
   }, []);
 
-  async function handleDetectedSpeech(spokenText: string, language: string) {
+  async function handleDetectedSpeech(spokenText, language) {
     try {
       const aiText = await fetchAIResponse(spokenText);
       setAiResponse(aiText);
@@ -78,7 +77,7 @@ export const useSpeechRecognition = () => {
     }
   }
 
-  const detectLanguage = async (text: string): Promise<string> => {
+  const detectLanguage = async (text) => {
     const AZURE_OPENAI_API_KEY = import.meta.env.VITE_AZURE_OPENAI_KEY;
     const AZURE_OPENAI_ENDPOINT = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT;
     const DEPLOYMENT_NAME = import.meta.env.VITE_DEPLOYMENT_NAME;
