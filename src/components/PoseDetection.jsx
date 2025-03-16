@@ -2,8 +2,10 @@ import React, { useState, useRef, useEffect } from 'react';
 import ml5 from 'ml5';
 import p5 from 'p5';
 
+window.fingerTips = [];
+window.knuckles = [];
 const HandDetection = ({ onHandGrab, containerRef }) => {
-  const [handDetected, setHandDetected] = useState(false);
+  const [fistClosed, setFistClosed] = useState(false);
   const sketchRef = useRef();
 
   useEffect(() => {
@@ -16,21 +18,51 @@ const HandDetection = ({ onHandGrab, containerRef }) => {
         p.createCanvas(640, 480);
         video = p.createCapture(p.VIDEO);
         video.size(640, 480);
-        video.hide(); // Hide the default video element so we only see the canvas
+        video.hide(); // Hide the default video element
 
         // Initialize the handPose model
         handPose = ml5.handPose();
-
         // Start detecting hands from the webcam video
-        // This follows the ml5 example that uses detectStart with a callback.
         handPose.detectStart(video, gotHands);
       };
 
-      // Callback function for when handPose outputs data.
+      // Check if the hand forms a closed fist
+      function isFistClosed(hand) {
+        try {
+          window.fingerTips = hand.keypoints.filter(point => point.name.includes('tip'));
+          window.knuckles = hand.keypoints.filter(point => point.name.includes('mcp'));
+        } catch (error) {
+          return { result: false, points: null };
+        }
+
+        if (window.fingerTips.length === 5 && window.knuckles.length === 5) {
+          let avgFingerTipsY = window.fingerTips.reduce((sum, tip) => sum + tip.y, 0) / window.fingerTips.length;
+          let avgKnucklesY = window.knuckles.reduce((sum, knuckle) => sum + knuckle.y, 0) / window.knuckles.length;
+
+          console.log(avgFingerTipsY);
+          console.log(avgKnucklesY);
+
+          if (avgFingerTipsY > avgKnucklesY) {
+            let centerX = window.fingerTips.reduce((sum, tip) => sum + tip.x, 0) / window.fingerTips.length;
+            let centerY = avgFingerTipsY;
+            return { result: true, points: { x: centerX, y: centerY } };
+          }
+        }
+
+        return { result: false, points: null };
+      }
+
+      // Callback for when handPose outputs data
       function gotHands(results) {
         hands = results;
-        setHandDetected(results.length > 0);
-        if (results.length > 0 && onHandGrab) {
+        let fistStatus = false;
+        if (results.length > 0) {
+          fistStatus = isFistClosed(results[0]).result;
+        }
+        // Update the state to trigger UI changes
+        setFistClosed(fistStatus);
+        // Call the callback if a fist is detected
+        if (fistStatus && onHandGrab) {
           onHandGrab(results);
         }
       }
@@ -38,16 +70,14 @@ const HandDetection = ({ onHandGrab, containerRef }) => {
       p.draw = () => {
         // Draw the webcam video onto the canvas
         p.image(video, 0, 0, p.width, p.height);
-
         // Draw all the tracked hand keypoints
         for (let i = 0; i < hands.length; i++) {
           const hand = hands[i];
-          for (let j = 0; j < hand.keypoints.length; j++) {
-            const keypoint = hand.keypoints[j];
+          hand.keypoints.forEach((keypoint) => {
             p.fill(0, 255, 0);
             p.noStroke();
             p.circle(keypoint.x, keypoint.y, 10);
-          }
+          });
         }
       };
     };
@@ -66,7 +96,7 @@ const HandDetection = ({ onHandGrab, containerRef }) => {
   return (
     <div>
       <div ref={containerRef}></div>
-      {handDetected && <h1>Success :)</h1>}
+      {fistClosed && <h1>Fist grabbed!</h1>}
     </div>
   );
 };
